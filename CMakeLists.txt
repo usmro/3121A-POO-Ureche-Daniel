@@ -11,8 +11,16 @@ include_directories(include)
 file(GLOB_RECURSE SRC_FILES src/*.cpp)
 add_executable(TrafficSimApp ${SRC_FILES})
 
-# Basic simple Tests Executable (optional for now, will configure properly in Stage 5, but let's add a placeholder)
-# file(GLOB_RECURSE TEST_FILES tests/*.cpp)
-# if(TEST_FILES)
-#     add_executable(TrafficSimTests ${TEST_FILES})
-# endif()
+# Threads (necesar pentru engine-ul de simulare real-time)
+find_package(Threads REQUIRED)
+target_link_libraries(TrafficSimApp PRIVATE Threads::Threads)
+
+# Basic simple Tests Executable
+file(GLOB_RECURSE TEST_FILES tests/*.cpp)
+file(GLOB_RECURSE SRC_NO_MAIN src/*.cpp)
+list(REMOVE_ITEM SRC_NO_MAIN "${CMAKE_SOURCE_DIR}/src/main.cpp")
+
+if(TEST_FILES)
+    add_executable(TrafficSimTests ${TEST_FILES} ${SRC_NO_MAIN})
+    target_link_libraries(TrafficSimTests PRIVATE Threads::Threads)
+endif()
