@@ -1,51 +1,88 @@
-# Simulare de Trafic Rutier
+# Proiect POO: Simulare de Trafic Rutier (Digital Twin & Hardware-In-The-Loop)
 
-Proiect C++ dezvoltat pentru cursul de Programare Orientată pe Obiecte (POO).
-Tema proiectului este realizarea unei simulări în care vehiculele se deplasează pe o rețea de străzi coordonate de intersecții, respectând un set simplu de reguli de circulație.
+**Autor:** Ureche Daniel (Grupa 3121A)  
+**Materie:** Programare Orientată pe Obiecte (POO)
 
-Proiectul urmărește aplicarea concretă a fundamentelor POO (Încapsulare, Moștenire, Polimorfism și Compoziție), gestionarea codului sursă variat (Git), și folosirea instrumentelor moderne (CMake).
-
----
-
-## 🛠️ Stadiul Curent al Implementării
-
-Până în prezent s-au implementat următoarele module din cerințele obligatorii și facultative, structurate arhitectural sub forma primelor 3 mari etape:
-
-### 1. Etapa de Setare & Logarea Evenimentelor (Pattern Observer)
-- S-a creat **Logger**-ul proiectului folosind *Observer Pattern* (cerință facultativă), decuplând mecanismul de printare și salvare log în fișierul `traffic_log.txt` de clasele de rețea.
-- S-au definit primele instrucțiuni din asamblarea codului via `CMake`.
-
-### 2. Etapa Vehiculelor (Clase Abstracte și Polimorfism)
-- S-a creat interfața/clasa abstractă de bază `Vehicul`.
-- S-au definit clasele derivate **Vehicul → Masina, Motocicleta, Camion**.
-- A fost validat polimorfismul primar: viteze maxime diferite rezultă într-un calcul diferit al timpilor de tranzit, alături de mesaje dinamice polimorfice pentru cum reacționează sau frânează șoferii când ajung la intrarea într-o intersecție.
-
-### 3. Etapa Rețelei (Compoziția)
-- Conceptul de Compoziție este demonstrat prin clasa `ReteaRutiera`, care încapsulează direct obiecte de tip `Intersectie` și `Strada`.
-- S-a implementat transmiterea și delegarea evenimentelor: Străzile pot impune limite de viteză, în timp ce Intersecțiile notifică Loggerul instantaneu de fiecare dată când un vehicul le tranzitează sau când se generează un pre-text de "Coliziune".
+Acest proiect reprezintă o **Simulare de Trafic Rutier** avansată dezvoltată în C++, care evoluează de la conceptele clasice de OOP (Object-Oriented Programming) într-un sistem de tip **Digital Twin / Hardware-In-The-Loop (HIL)**. Simulatorul comunică bidirecțional cu o dioramă fizică (reprezentată printr-un Arduino, bariere și LED-uri) pentru a vizualiza în timp real traficul calculat de motorul C++.
 
 ---
 
-## 🚀 Planuri de Viitor (Ce urmează să fie implementat)
+## 🚀 Funcționalități Principale
 
-Proiectul nu este finalizat 100%. În următoarele etape ne concentrăm pe exigențele finale de evaluare (Etapele 4 și 5):
+1. **Motor de Simulare Real-Time (C++)**
+   - Procesează mișcarea vehiculelor pe baza unor calcule fizice (distanță, limită de viteză pe stradă, limită de viteză a vehiculului).
+   - Buclă de simulare non-blocantă, controlabilă prin comenzi: `Start`, `Pauză / Reluare`.
+   
+2. **Rutare Dinamică (Algoritmul Dijkstra)**
+   - Vehiculele își calculează automat traseul optim de la punctul de intrare (Bariere) până la destinație, folosind algoritmul Dijkstra pe baza distanțelor (costurilor) din rețeaua rutieră.
 
-- [ ] **Sistem Real-Time / Engine de Simulare:** Integrarea unei bucle avansate de simulare cu funcții explicite de control: `Start`, `Pauză` și `Accelerare` (cerință facultativă).
-- [ ] **Export de date CSV:** Salvarea și interpretarea datelor rutiere logate la finalul executiei într-un sistem persitent (ex: istoric_stradal.csv) sub forma de statistici de trafic.
-- [ ] **Suita de Teste Unitare:** Dezvoltarea unui fișier dedicat, automatizat la build cu reguli interne sau CAssert pentru ca proiectul să dispună de verificare corectă de rute și calcul viteză.
-- [ ] **Documentația Teoretică (PDF/Markdown):** Includerea diagramelor UML ce vor justifica relațiile structurale ale claselor noastre și documentarea deciziilor finale.
+3. **Integrare Hardware (Dioramă Fizică)**
+   - **Protocol Serial (`IHardwareBridge`):** Aplicația C++ trimite semnale către portul serial.
+   - **Shift Registers (74HC595):** Controlul precis al multiplexării LED-urilor pentru a aprinde segmentele de stradă fizice, reflectând poziția mașinii din cod.
+   - **Bariere Automate:** Comenzi de deschidere/închidere pentru servomotoarele aflate la punctele de intrare/ieșire de pe dioramă.
+
+4. **Sistem de Logare Avansat**
+   - Monitorizare asincronă și salvare în fișierul `traffic_log.txt` pe baza **Observer Pattern**, decuplând intersecțiile de mecanismul de printare.
 
 ---
 
-## ⚙️ Cum se instalează / rulează
+## 🛠️ Arhitectura și Concepte POO
 
-*Atenție: Proiectul folosește C++17 și CMake (minim 3.10).*
-(Aceste instrucțiuni vor fi detaliate la momentul punerii la punct a build-ului final în Etapele avansate).
+Proiectul a fost proiectat respectând rigorile academice:
+- **Încapsulare:** Starea internă a vehiculelor și străzilor este strict privată și controlată prin metode getter/setter.
+- **Moștenire și Abstractizare:** O clasă de bază abstractă `Vehicul`, derivată în clasele concrete `Masina`, `Motocicleta`, `Camion`, fiecare având atribute proprii de gabarit și viteză.
+- **Polimorfism:** Când rețeaua rulează bucla principală, apelează calculul timpului de parcurgere și al avansării abstract pe un vector de pointeri inteligenți `Vehicul*`, permițând comportamente personalizate la runtime (ex. camionul merge mai încet).
+- **Compoziție:** Clasa `ReteaRutiera` încapsulează componentele `Strada` și `Intersectie` folosind `std::unique_ptr` gestionând perfect ciclul de viață al acestora.
+- **Design Patterns:** *Observer Pattern* implementat prin interfețele `IObserver` / `ISubject` pentru logarea evenimentelor de tranzit.
 
+---
+
+## 📂 Structura Proiectului
+
+```text
+Proiect POO/
+│
+├── src/           # Codul sursă C++ (.cpp)
+├── include/       # Fișierele header C++ (.hpp)
+├── tests/         # Suita de teste unitare (main_tests.cpp)
+├── hardware/      # Cod sursă Arduino (.ino) și scheme electronice
+├── docs/          # Documentație (UML, Justificare POO, Ghid Hardware)
+├── CMakeLists.txt # Sistemul de build automatizat
+├── README.md      # Prezentarea proiectului
+└── traffic_log.txt# Fișierul de log generat la execuție
+```
+
+---
+
+## ⚙️ Cum se instalează și rulează
+
+Proiectul folosește standardul **C++17** și sistemul de build **CMake** (minim 3.10).
+
+### Compilarea proiectului
 ```bash
 mkdir build
 cd build
 cmake ..
 cmake --build .
-./TrafficSimApp
 ```
+
+### Rularea Simulării
+```bash
+# Pe Windows
+.\build\Debug\ProiectPOO.exe
+
+# Pe Linux/WSL
+./build/ProiectPOO
+```
+
+### Rularea Testelor Unitare
+```bash
+# Pe Windows
+.\build\Debug\TestsPOO.exe
+
+# Pe Linux/WSL
+./build/TestsPOO
+```
+
+---
+*Pentru detalii suplimentare referitoare la setup-ul hardware și configurarea pinilor pentru dioramă, consultați documentele din folderul `docs/`.*
