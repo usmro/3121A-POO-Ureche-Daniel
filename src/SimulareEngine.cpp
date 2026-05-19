@@ -153,26 +153,30 @@ void SimulareEngine::buclaSimulare() {
 
         // --- LOGICA SEMAFOR ---
         // Blocam vehiculul in 2 situatii:
-        // 1. Se APROPIE de I1/I4 (destinatie == "I1"/"I4") si e la >= 85%
-        // 2. TOCMAI A INTRAT pe o strada din I1/I4 (sursa == "I1"/"I4") si e la < 10%
-        //    (a scapat de verificarea anterioara din cauza vitezei, il prindem la start)
+        // 1. Se APROPIE de I1/I4 (dest=="I1"/"I4") si e la >= 85%
+        // 2. TOCMAI A INTRAT pe o strada din I1/I4 (sursa=="I1"/"I4") si e la < 10%
+        //    EXCEPTIE: Daca drum duce la B1/B2 (iesire din oras), NU blocam!
+        //    (vehiculul a trecut deja intersectia si se indreapta spre iesire)
         bool blocat = false;
         {
           double progresNorm = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
           std::string dest  = stradaCurenta->getDestinatie();
           std::string sursa = stradaCurenta->getSursa();
+          bool eStradaDeIesire = (dest == "B1" || dest == "B2");
 
           if (lastS1) {
-            if ((progresNorm >= 0.85 && dest == "I1") ||
-                (progresNorm <  0.10 && sursa == "I1")) {
+            bool headingToI1  = (progresNorm >= 0.85 && dest == "I1");
+            bool justLeftI1   = (progresNorm <  0.10 && sursa == "I1" && !eStradaDeIesire);
+            if (headingToI1 || justLeftI1) {
               blocat = true;
               std::cout << "[Semafor ROSU] " << v->getId() << " blocat la I1...\r";
               std::cout.flush();
             }
           }
           if (lastS4) {
-            if ((progresNorm >= 0.85 && dest == "I4") ||
-                (progresNorm <  0.10 && sursa == "I4")) {
+            bool headingToI4  = (progresNorm >= 0.85 && dest == "I4");
+            bool justLeftI4   = (progresNorm <  0.10 && sursa == "I4" && !eStradaDeIesire);
+            if (headingToI4 || justLeftI4) {
               blocat = true;
               std::cout << "[Semafor ROSU] " << v->getId() << " blocat la I4...\r";
               std::cout.flush();
