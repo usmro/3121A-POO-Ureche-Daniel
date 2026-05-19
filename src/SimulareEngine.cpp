@@ -6,7 +6,7 @@
 #include <iostream>
 
 SimulareEngine::SimulareEngine()
-    : isRunning(false), isPaused(false), speedMultiplier(1.5) {
+    : isRunning(false), isPaused(false), speedMultiplier(3.0) {
   // Initializare punte hardware
 #ifdef __linux__
   hwBridge = std::make_unique<SerialHardwareBridge>("/dev/ttyUSB0");
@@ -150,39 +150,37 @@ void SimulareEngine::buclaSimulare() {
           continue;
         }
 
-        // Calcul viteza
-        double timpMax = v->calculeazaTimpParcurgere(
-            stradaCurenta->getLungime(), stradaCurenta->getLimitaViteza());
-        double vitezaMps = stradaCurenta->getLungime() / timpMax;
+        // --- LOGICA SEMAFOR: Blocam vehiculul daca urmeaza o intersectie cu ROSU ---
+        // Verificam daca vehiculul e la sfarsitul strazii si semaforul e rosu.
+        // Daca da, NU il lasam sa avanseze in tick-ul acesta.
+        bool blocat = false;
+        {
+          double progresNorm = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
+          bool aproapeDeFinal = (progresNorm >= 0.95);
+          std::string numeSt = stradaCurenta->getNume();
 
-        bool aTerminatStrada =
-            v->avanseaza(dt, stradaCurenta->getLimitaViteza());
+          // S1_inv duce la I1, S4 duce la I4
+          if (aproapeDeFinal && numeSt == "S1_inv" && lastS1) {
+            blocat = true;
+            std::cout << "[Semafor] " << v->getId() << " asteapta ROSU la I1...\r";
+            std::cout.flush();
+          } else if (aproapeDeFinal && numeSt == "S4" && lastS4) {
+            blocat = true;
+            std::cout << "[Semafor] " << v->getId() << " asteapta ROSU la I4...\r";
+            std::cout.flush();
+          }
+        }
+
+        bool aTerminatStrada = false;
+        if (!blocat) {
+          aTerminatStrada = v->avanseaza(dt, stradaCurenta->getLimitaViteza());
+        }
 
         std::string numeStradaVeche = stradaCurenta->getNume();
 
         if (aTerminatStrada) {
           std::cout << "\n> [" << v->getId() << "] a terminat "
                     << numeStradaVeche << "\n";
-
-          // --- LOGICA DE DEVIERE LA SEMAFOR ROSU ---
-          // Daca termina S1_inv (ajunge la I1) si e rosu, o ia la dreapta spre
-          // I4 (pe S5_inv).
-          if (numeStradaVeche == "S1_inv" && lastS1) {
-            std::cout << "[Semafor] " << v->getId()
-                      << " a prins ROSU la I1! Deviaza la DREAPTA spre I4.\n";
-            auto rutaOcolitoare =
-                retea.calculeazaRutaOptima("I1", "B2"); // Prin I4 automat
-            v->setRuta(rutaOcolitoare);
-          }
-          // Daca termina S4 (ajunge la I4) si e rosu, o ia la dreapta spre I1
-          // (pe S5).
-          else if (numeStradaVeche == "S4" && lastS4) {
-            std::cout << "[Semafor] " << v->getId()
-                      << " a prins ROSU la I4! Deviaza la DREAPTA spre I1.\n";
-            auto rutaOcolitoare =
-                retea.calculeazaRutaOptima("I4", "B1"); // Prin I1 automat
-            v->setRuta(rutaOcolitoare);
-          }
         }
 
         // --- BUGFIX MAJOR: REFRESH LA STRADA CURENTA ---
