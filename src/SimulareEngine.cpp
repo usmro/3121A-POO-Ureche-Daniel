@@ -60,11 +60,11 @@ void SimulareEngine::buclaSimulare() {
       bool currentS4 = ((seconds + 5) % 20) < 10; // Decalat cu 5 secunde
 
       if (firstTimeSemafor || currentS1 != lastS1) {
-        hwBridge->setSemafor(1, currentS1 ? "R" : "G");
+        hwBridge->setSemafor(1, currentS1 ? "R" : "G"); // SF1 = I1 (D7/D8)
         lastS1 = currentS1;
       }
       if (firstTimeSemafor || currentS4 != lastS4) {
-        hwBridge->setSemafor(4, currentS4 ? "R" : "G");
+        hwBridge->setSemafor(2, currentS4 ? "R" : "G"); // SF2 = I4 (D9/D10)
         lastS4 = currentS4;
       }
       firstTimeSemafor = false;
@@ -125,17 +125,18 @@ void SimulareEngine::buclaSimulare() {
           // Vehiculul a ajuns la finalul traseului
           std::cout << "> [" << v->getId() << "] a iesit de pe diorama.\n";
 
-          // Trebuie sa verificam care a fost ultima strada pentru a sti ce
-          // bariera sa deschidem Alternativ, ne putem uita la destinatia
-          // initiala a vehiculului (cum a fost calculata ruta). Momentan
-          // simulam deschiderea barierei corespunzatoare Daca s-a terminat pe
-          // S1 sau S1_inv, e B1. Daca e S6, e B2. (Sau pur si simplu le
-          // deschidem pe ambele scurt pentru test)
-          hwBridge->setBariera(1, true);
-          hwBridge->setBariera(2, true);
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
-          hwBridge->setBariera(1, false);
-          hwBridge->setBariera(2, false);
+          // Detectam bariera corecta din destinatia ultimei strazi din ruta
+          auto ruta = v->getRuta();
+          int idBariera = 1; // default B1
+          if (!ruta.empty()) {
+            std::string dest = ruta.back()->getDestinatie();
+            if (dest == "B2") idBariera = 2;
+            else idBariera = 1;
+          }
+
+          hwBridge->setBariera(idBariera, true);
+          std::this_thread::sleep_for(std::chrono::milliseconds(600));
+          hwBridge->setBariera(idBariera, false);
 
           // Stingem ultimul LED cand a iesit
           if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
