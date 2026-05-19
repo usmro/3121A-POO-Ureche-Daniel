@@ -189,8 +189,9 @@ void SimulareEngine::buclaSimulare() {
         if (!stradaCurenta) {
           // A terminat toata ruta! Stingem ultimele LED-uri.
           if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
-            for (auto oldLed : ultimeleLeduri[v->getId()]) {
-              hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            auto oldLeds = ultimeleLeduri[v->getId()];
+            for (auto l : oldLeds) {
+              hwBridge->setLedStatus(l.first, l.second, false);
             }
             ultimeleLeduri.erase(v->getId());
           }
