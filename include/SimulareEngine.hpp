@@ -6,6 +6,7 @@
 #include <thread>
 #include <atomic>
 #include <string>
+#include <map>
 #include "ReteaRutiera.hpp"
 #include "Vehicul.hpp"
 #include "HardwareBridge.hpp"
@@ -16,6 +17,7 @@ private:
     std::vector<std::unique_ptr<Vehicul>> vehiculeActive;
     std::vector<std::unique_ptr<Vehicul>> vehiculeInAsteptare;
     std::unique_ptr<IHardwareBridge> hwBridge;
+    std::map<std::string, std::pair<int, int>> ultimeleLeduri;
 
     
     std::atomic<bool> isRunning;

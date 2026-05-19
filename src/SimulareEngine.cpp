@@ -106,6 +106,13 @@ void SimulareEngine::buclaSimulare() {
           hwBridge->setBariera(1, false);
           hwBridge->setBariera(2, false);
 
+          // Stingem ultimul LED cand a iesit
+          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
+            auto oldLed = ultimeleLeduri[v->getId()];
+            hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            ultimeleLeduri.erase(v->getId());
+          }
+
           it = vehiculeActive.erase(it);
           continue;
         }
@@ -148,7 +155,24 @@ void SimulareEngine::buclaSimulare() {
           if (invers)
             indexLed = 7 - indexLed; // Merge invers fizic pe LED-uri
 
-          hwBridge->setLedStatus(idHardware, indexLed, true);
+          // Verificam daca masina tocmai a intrat pe un LED nou fata de ultima ei pozitie
+          bool pozitieNoua = true;
+          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
+            auto oldLed = ultimeleLeduri[v->getId()];
+            if (oldLed.first == idHardware && oldLed.second == indexLed) {
+              pozitieNoua = false; // A ramas pe acelasi LED
+            } else {
+              // S-a mutat! Stingem LED-ul din spatele ei
+              hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            }
+          }
+
+          if (pozitieNoua) {
+            // Aprindem noul LED unde se afla
+            hwBridge->setLedStatus(idHardware, indexLed, true);
+            // Actualizam ultima ei pozitie
+            ultimeleLeduri[v->getId()] = {idHardware, indexLed};
+          }
         }
 
         if (aTerminatStrada) {
