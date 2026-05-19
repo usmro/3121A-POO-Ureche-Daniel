@@ -26,8 +26,9 @@ class SerialHardwareBridge : public IHardwareBridge {
 private:
     std::string portName;
     bool isConnected;
-    // In mod normal aici tinem handle-ul pentru port (HANDLE pe Windows, int fd pe Linux)
-    // Pentru compatibilitate si lipsa erorilor pe sisteme fara port, facem o abstractizare
+#ifdef __linux__
+    int serial_fd = -1;
+#endif
 
 public:
     SerialHardwareBridge(const std::string& port = "COM3");
