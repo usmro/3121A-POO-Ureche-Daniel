@@ -151,20 +151,19 @@ void SimulareEngine::buclaSimulare() {
         }
 
         // --- LOGICA SEMAFOR: Blocam vehiculul daca urmeaza o intersectie cu ROSU ---
-        // Verificam daca vehiculul e la sfarsitul strazii si semaforul e rosu.
-        // Daca da, NU il lasam sa avanseze in tick-ul acesta.
+        // Verificam DESTINATIA strazii curente (nu numele), astfel prinde
+        // orice vehicul care se indreapta spre I1 sau I4, indiferent de drum.
         bool blocat = false;
         {
           double progresNorm = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
           bool aproapeDeFinal = (progresNorm >= 0.95);
-          std::string numeSt = stradaCurenta->getNume();
+          std::string dest = stradaCurenta->getDestinatie();
 
-          // S1_inv duce la I1, S4 duce la I4
-          if (aproapeDeFinal && numeSt == "S1_inv" && lastS1) {
+          if (aproapeDeFinal && dest == "I1" && lastS1) {
             blocat = true;
             std::cout << "[Semafor] " << v->getId() << " asteapta ROSU la I1...\r";
             std::cout.flush();
-          } else if (aproapeDeFinal && numeSt == "S4" && lastS4) {
+          } else if (aproapeDeFinal && dest == "I4" && lastS4) {
             blocat = true;
             std::cout << "[Semafor] " << v->getId() << " asteapta ROSU la I4...\r";
             std::cout.flush();
