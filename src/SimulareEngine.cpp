@@ -8,7 +8,7 @@
 SimulareEngine::SimulareEngine()
     : isRunning(false), isPaused(false), speedMultiplier(1) {
   // Initializare punte hardware
-  hwBridge = std::make_unique<SerialHardwareBridge>("COM3");
+  hwBridge = std::make_unique<SerialHardwareBridge>("/dev/ttyUSB0");
 }
 
 SimulareEngine::~SimulareEngine() { opreste(); }
@@ -172,11 +172,15 @@ void SimulareEngine::buclaSimulare() {
             hwBridge->setLedStatus(idHardware, indexLed, true);
             // Actualizam ultima ei pozitie
             ultimeleLeduri[v->getId()] = {idHardware, indexLed};
+          } else {
+             // Printam progresul pe aceeasi linie ca sa nu para blocata consola
+             std::cout << "[Simulare] " << v->getId() << " e inca pe LED-ul " << indexLed << " (Progres strada: " << (int)(progres * 100) << "%)\r";
+             std::cout.flush();
           }
         }
 
         if (aTerminatStrada) {
-          std::cout << "> [" << v->getId() << "] a terminat "
+          std::cout << "\n> [" << v->getId() << "] a terminat "
                     << stradaCurenta->getNume() << "\n";
         }
         ++it;
