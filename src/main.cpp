@@ -53,10 +53,11 @@ int main() {
     engine.getRetea().adaugaStrada(std::make_unique<Strada>("S6", "I4", "B2", 1000.0, 50.0));
     engine.getRetea().adaugaStrada(std::make_unique<Strada>("S6_inv", "B2", "I4", 1000.0, 50.0));
 
-    // 2. Adaugam vehiculele in coada de asteptare (ex. 10 vehicule)
+    // 2. Adaugam vehiculele in coada de asteptare
     for (int i = 1; i <= 5; ++i) {
         engine.adaugaVehicul(std::make_unique<Masina>("MASINA-" + std::to_string(i), 60.0));
         engine.adaugaVehicul(std::make_unique<Camion>("CAMION-" + std::to_string(i), 50.0));
+        engine.adaugaVehicul(std::make_unique<Motocicleta>("MOTO-" + std::to_string(i), 80.0));
     }
 
     // 3. Pornim simularea

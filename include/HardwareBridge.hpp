@@ -16,6 +16,9 @@ public:
     // Trimite o comanda de bariera
     virtual void setBariera(int intersectieId, bool deschis) = 0;
 
+    // Seteaza culoarea unui semafor ("G" = Verde, "R" = Rosu)
+    virtual void setSemafor(int idSemafor, const std::string& culoare) = 0;
+
     // Verifica mesaje primite de la Arduino (Senzori)
     // Returneaza string gol daca nu exista mesaj, sau mesajul (ex: "C:1:80" = Congestie pe Strada 1, 80%)
     virtual std::string citesteMesajSenzor() = 0;
@@ -36,6 +39,7 @@ public:
 
     void setLedStatus(int stradaId, int pozitie, bool status) override;
     void setBariera(int intersectieId, bool deschis) override;
+    void setSemafor(int idSemafor, const std::string& culoare) override;
     std::string citesteMesajSenzor() override;
 };
 

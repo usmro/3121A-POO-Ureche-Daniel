@@ -44,9 +44,32 @@ void SimulareEngine::setViteza(double m) {
 void SimulareEngine::buclaSimulare() {
   auto lastTime = std::chrono::steady_clock::now();
 
+  static bool firstTimeSemafor = true;
+  static bool lastS1 = false;
+  static bool lastS4 = false;
+
   while (isRunning) {
     if (!isPaused) {
       auto currentTime = std::chrono::steady_clock::now();
+
+      // --- LOGICA SEMAFOARE INTERSECTII I1 SI I4 ---
+      int seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                        currentTime.time_since_epoch())
+                        .count();
+      bool currentS1 = (seconds % 20) < 10;       // 10s Verde, 10s Rosu
+      bool currentS4 = ((seconds + 5) % 20) < 10; // Decalat cu 5 secunde
+
+      if (firstTimeSemafor || currentS1 != lastS1) {
+        hwBridge->setSemafor(1, currentS1 ? "R" : "G");
+        lastS1 = currentS1;
+      }
+      if (firstTimeSemafor || currentS4 != lastS4) {
+        hwBridge->setSemafor(4, currentS4 ? "R" : "G");
+        lastS4 = currentS4;
+      }
+      firstTimeSemafor = false;
+      // ---------------------------------------------
+
       std::chrono::duration<double> dtDuration = currentTime - lastTime;
       double dt = dtDuration.count() * speedMultiplier; // delta time
       lastTime = currentTime;
@@ -66,7 +89,11 @@ void SimulareEngine::buclaSimulare() {
 
           std::string start = bariere[rand() % 2];
           std::string mid = intersectii[rand() % 4];
-          std::string end = bariere[rand() % 2];
+
+          // OBLIGATORIU: end trebuie sa fie diferit de start, altfel masina
+          // intra in oras (pana la mid) si se intoarce inapoi pe aceeasi strada
+          // (U-Turn).
+          std::string end = (start == "B1") ? "B2" : "B1";
 
           auto ruta1 = retea.calculeazaRutaOptima(start, mid);
           auto ruta2 = retea.calculeazaRutaOptima(mid, end);
@@ -129,22 +156,42 @@ void SimulareEngine::buclaSimulare() {
         bool aTerminatStrada =
             v->avanseaza(dt, stradaCurenta->getLimitaViteza());
 
+        std::string numeStradaVeche = stradaCurenta->getNume();
+
         if (aTerminatStrada) {
           std::cout << "\n> [" << v->getId() << "] a terminat "
-                    << stradaCurenta->getNume() << "\n";
+                    << numeStradaVeche << "\n";
+
+          // --- LOGICA DE DEVIERE LA SEMAFOR ROSU ---
+          // Daca termina S1_inv (ajunge la I1) si e rosu, o ia la dreapta spre
+          // I4 (pe S5_inv).
+          if (numeStradaVeche == "S1_inv" && lastS1) {
+            std::cout << "[Semafor] " << v->getId()
+                      << " a prins ROSU la I1! Deviaza la DREAPTA spre I4.\n";
+            auto rutaOcolitoare =
+                retea.calculeazaRutaOptima("I1", "B2"); // Prin I4 automat
+            v->setRuta(rutaOcolitoare);
+          }
+          // Daca termina S4 (ajunge la I4) si e rosu, o ia la dreapta spre I1
+          // (pe S5).
+          else if (numeStradaVeche == "S4" && lastS4) {
+            std::cout << "[Semafor] " << v->getId()
+                      << " a prins ROSU la I4! Deviaza la DREAPTA spre I1.\n";
+            auto rutaOcolitoare =
+                retea.calculeazaRutaOptima("I4", "B1"); // Prin I1 automat
+            v->setRuta(rutaOcolitoare);
+          }
         }
 
         // --- BUGFIX MAJOR: REFRESH LA STRADA CURENTA ---
-        // Daca tocmai a sarit pe alta strada, trebuie sa recitim pointerul,
-        // altfel foloseste vechea strada pentru maparea hardware (si licarea
-        // LED 0)!
         stradaCurenta = v->getStradaCurenta();
 
         if (!stradaCurenta) {
-          // A terminat toata ruta! Stingem ultimul LED.
+          // A terminat toata ruta! Stingem ultimele LED-uri.
           if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
-            auto oldLed = ultimeleLeduri[v->getId()];
-            hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            for (auto oldLed : ultimeleLeduri[v->getId()]) {
+              hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            }
             ultimeleLeduri.erase(v->getId());
           }
           it = vehiculeActive.erase(it);
@@ -181,35 +228,54 @@ void SimulareEngine::buclaSimulare() {
         if (idHardware != -1) {
           double progres =
               v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
-          int indexLed = (int)(progres * 8.0);
-          if (indexLed >= 8)
-            indexLed = 7;
-          if (invers)
-            indexLed = 7 - indexLed; // Merge invers fizic pe LED-uri
+          int baseIndexLed = (int)(progres * 8.0);
+          if (baseIndexLed >= 8)
+            baseIndexLed = 7;
 
-          // Verificam daca masina tocmai a intrat pe un LED nou fata de ultima
-          // ei pozitie
-          bool pozitieNoua = true;
-          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
-            auto oldLed = ultimeleLeduri[v->getId()];
-            if (oldLed.first == idHardware && oldLed.second == indexLed) {
-              pozitieNoua = false; // A ramas pe acelasi LED
-            } else {
-              // S-a mutat! Stingem LED-ul din spatele ei
-              hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+          int numLeds = 2; // Default masina
+          if (v->getId().find("MOTO") != std::string::npos)
+            numLeds = 1;
+          else if (v->getId().find("CAMION") != std::string::npos)
+            numLeds = 3;
+
+          std::vector<std::pair<int, int>> noileLeduri;
+          for (int i = 0; i < numLeds; ++i) {
+            int logicIndex = baseIndexLed - i;
+            if (logicIndex >= 0 && logicIndex < 8) {
+              int hwIndex = logicIndex;
+              if (invers)
+                hwIndex = 7 - hwIndex;
+              noileLeduri.push_back({idHardware, hwIndex});
             }
           }
 
-          if (pozitieNoua) {
-            // Aprindem noul LED unde se afla
-            hwBridge->setLedStatus(idHardware, indexLed, true);
-            // Actualizam ultima ei pozitie
-            ultimeleLeduri[v->getId()] = {idHardware, indexLed};
-          } else {
+          bool pozitieNoua = false;
+          auto &oldLeds = ultimeleLeduri[v->getId()];
+
+          if (oldLeds != noileLeduri) {
+            pozitieNoua = true;
+            // Stingem ce nu mai este in "noileLeduri"
+            for (auto oldL : oldLeds) {
+              if (std::find(noileLeduri.begin(), noileLeduri.end(), oldL) ==
+                  noileLeduri.end()) {
+                hwBridge->setLedStatus(oldL.first, oldL.second, false);
+              }
+            }
+            // Aprindem ce e nou
+            for (auto newL : noileLeduri) {
+              if (std::find(oldLeds.begin(), oldLeds.end(), newL) ==
+                  oldLeds.end()) {
+                hwBridge->setLedStatus(newL.first, newL.second, true);
+              }
+            }
+            ultimeleLeduri[v->getId()] = noileLeduri;
+          }
+
+          if (!pozitieNoua) {
             // Printam progresul pe linie noua ca sa fie 100% vizibil in
             // terminal
             std::cout << "[Simulare] " << v->getId() << " parcurge " << nume
-                      << " - LED: " << indexLed
+                      << " - LED Base: " << baseIndexLed
                       << " (Progres: " << (int)(progres * 100) << "%)\n";
           }
         }

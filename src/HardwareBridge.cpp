@@ -108,3 +108,15 @@ std::string SerialHardwareBridge::citesteMesajSenzor() {
 
   return ""; // Empty pt moment
 }
+
+void SerialHardwareBridge::setSemafor(int idSemafor, const std::string& culoare) {
+  if (!isConnected)
+    return;
+
+  std::string cmd = "SF" + std::to_string(idSemafor) + "," + culoare + "\n";
+  std::cout << "[Serial TX] -> " << cmd;
+#ifdef __linux__
+  if (serial_fd != -1)
+    write(serial_fd, cmd.c_str(), cmd.length());
+#endif
+}
