@@ -1,14 +1,18 @@
 #include "SimulareEngine.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
 
 SimulareEngine::SimulareEngine()
-    : isRunning(false), isPaused(false), speedMultiplier(1) {
+    : isRunning(false), isPaused(false), speedMultiplier(1.5) {
   // Initializare punte hardware
+#ifdef __linux__
   hwBridge = std::make_unique<SerialHardwareBridge>("/dev/ttyUSB0");
+#else
+  hwBridge = std::make_unique<SerialHardwareBridge>("COM3");
+#endif
 }
 
 SimulareEngine::~SimulareEngine() { opreste(); }
@@ -32,7 +36,7 @@ void SimulareEngine::porneste() {
 
 void SimulareEngine::opreste() { isRunning = false; }
 void SimulareEngine::togglePauza() { isPaused = !isPaused; }
-void SimulareEngine::setViteza(int m) {
+void SimulareEngine::setViteza(double m) {
   if (m > 0)
     speedMultiplier = m;
 }
@@ -125,6 +129,28 @@ void SimulareEngine::buclaSimulare() {
         bool aTerminatStrada =
             v->avanseaza(dt, stradaCurenta->getLimitaViteza());
 
+        if (aTerminatStrada) {
+          std::cout << "\n> [" << v->getId() << "] a terminat "
+                    << stradaCurenta->getNume() << "\n";
+        }
+
+        // --- BUGFIX MAJOR: REFRESH LA STRADA CURENTA ---
+        // Daca tocmai a sarit pe alta strada, trebuie sa recitim pointerul,
+        // altfel foloseste vechea strada pentru maparea hardware (si licarea
+        // LED 0)!
+        stradaCurenta = v->getStradaCurenta();
+
+        if (!stradaCurenta) {
+          // A terminat toata ruta! Stingem ultimul LED.
+          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
+            auto oldLed = ultimeleLeduri[v->getId()];
+            hwBridge->setLedStatus(oldLed.first, oldLed.second, false);
+            ultimeleLeduri.erase(v->getId());
+          }
+          it = vehiculeActive.erase(it);
+          continue;
+        }
+
         // Mapare LED-uri: gasim ID-ul strazii din denumire
         std::string nume = stradaCurenta->getNume();
         int idHardware = -1;
@@ -146,6 +172,12 @@ void SimulareEngine::buclaSimulare() {
         if (nume.find("_inv") != std::string::npos)
           invers = true;
 
+        // Daca suntem pe S1 sau S2, cablarea lor fizica este in sens opus!
+        // Deci inversam logica de sens pentru ele
+        if (idHardware == 0 || idHardware == 1) {
+          invers = !invers;
+        }
+
         if (idHardware != -1) {
           double progres =
               v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
@@ -155,7 +187,8 @@ void SimulareEngine::buclaSimulare() {
           if (invers)
             indexLed = 7 - indexLed; // Merge invers fizic pe LED-uri
 
-          // Verificam daca masina tocmai a intrat pe un LED nou fata de ultima ei pozitie
+          // Verificam daca masina tocmai a intrat pe un LED nou fata de ultima
+          // ei pozitie
           bool pozitieNoua = true;
           if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
             auto oldLed = ultimeleLeduri[v->getId()];
@@ -173,16 +206,14 @@ void SimulareEngine::buclaSimulare() {
             // Actualizam ultima ei pozitie
             ultimeleLeduri[v->getId()] = {idHardware, indexLed};
           } else {
-             // Printam progresul pe aceeasi linie ca sa nu para blocata consola
-             std::cout << "[Simulare] " << v->getId() << " e inca pe LED-ul " << indexLed << " (Progres strada: " << (int)(progres * 100) << "%)\r";
-             std::cout.flush();
+            // Printam progresul pe linie noua ca sa fie 100% vizibil in
+            // terminal
+            std::cout << "[Simulare] " << v->getId() << " parcurge " << nume
+                      << " - LED: " << indexLed
+                      << " (Progres: " << (int)(progres * 100) << "%)\n";
           }
         }
 
-        if (aTerminatStrada) {
-          std::cout << "\n> [" << v->getId() << "] a terminat "
-                    << stradaCurenta->getNume() << "\n";
-        }
         ++it;
       }
     } else {

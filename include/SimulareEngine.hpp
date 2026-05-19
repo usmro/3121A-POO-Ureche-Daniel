@@ -22,7 +22,7 @@ private:
     
     std::atomic<bool> isRunning;
     std::atomic<bool> isPaused;
-    std::atomic<int> speedMultiplier;
+    std::atomic<double> speedMultiplier;
 
     // Metoda privata rulata in thread-ul de simulare
     void buclaSimulare();
@@ -39,7 +39,7 @@ public:
     void porneste();
     void opreste();
     void togglePauza();
-    void setViteza(int multiplicator);
+    void setViteza(double multiplicator);
 };
 
 #endif // SIMULARE_ENGINE_HPP
