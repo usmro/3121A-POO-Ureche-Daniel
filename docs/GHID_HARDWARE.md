@@ -33,13 +33,13 @@ Acest document descrie **complet** tot ceea ce trebuie să cumperi, să conectez
 ### Componente Obligatorii
 | # | Componentă | Cantitate | Rol în Proiect |
 |---|---|---|---|
-| 1 | Arduino Nano / Uno | 1-2 buc | Creierul hardware, interfață USB-Serial cu PC |
-| 2 | IC Shift Register 74HC595 | 3-4 buc | Multiplexare LED-uri (1 IC = 8 LED-uri) |
-| 3 | LED-uri albe/galbene (3mm sau 5mm) | 30-40 buc | Reprezintă mașinile pe străzi |
-| 4 | LED-uri verzi (5mm) | 4 buc | Semafoare VERDE la intersecții |
-| 5 | LED-uri roșii (5mm) | 4 buc | Semafoare ROȘU la intersecții |
-| 6 | Rezistențe 220Ω | 40-50 buc | Limiteaza curentul pe fiecare LED |
-| 7 | Breadboard-uri | 6+ buc | Montarea componentelor pentru cele 6 străzi |
+| 1 | Arduino Nano / Uno | 1 buc | Creierul hardware, interfață USB-Serial cu PC |
+| 2 | IC Shift Register 74HC595 | 7 buc | Multiplexare LED-uri (1 IC = 8 LED-uri) |
+| 3 | LED-uri albe/galbene (3mm sau 5mm) | 48 buc | Reprezintă mașinile pe străzi |
+| 4 | LED-uri verzi (5mm) | 2 buc | Semafoare VERDE la intersecții |
+| 5 | LED-uri roșii (5mm) | 2 buc | Semafoare ROȘU la intersecții |
+| 6 | Rezistențe 220Ω | 48 buc | Limiteaza curentul pe fiecare LED |
+| 7 | Breadboard-uri | 7 buc | Montarea componentelor pentru cele 6 străzi |
 | 8 | Fire jumper Male-Male/Female-Male | 50+ buc | Conectare componente |
 | 9 | Cablu USB (tip B sau Micro-USB) | 1 buc | Conexiunea Arduino ↔ Laptop |
 | 10 | **Sursă de alimentare 5V** | 1 buc | **CRITIC:** Alimentare separată (ex: MB102 sau încărcător telefon 5V/2A) pentru LED-uri și Servomotoare |
@@ -69,7 +69,7 @@ Vom construi un oraș cu **4 intersecții** (I1, I2, I3, I4) legate prin **6 str
 ```
 
 > [!NOTE]
-> Fiecare **stradă** = un șir de 8-10 LED-uri albe pe breadboard (multiplexate prin 74HC595).
+> Fiecare **stradă** = un șir de 8 LED-uri albe pe breadboard (multiplexate prin 74HC595).
 > Fiecare **intersecție** = un LED verde + un LED roșu (semafor) + un punct de stradă.
 
 ---
@@ -106,12 +106,12 @@ Se înlănțuie (Daisy-chain) Pin 14 (Data) de la pinul 9 (Q7S) al IC-ului prece
 > **MAPARE BIȚI (Atenție):** Exact cum ai conectat fizic: primul pin hardware pe Shift Register este Q1 și ultimul este Q0. Conexiunile fizice ale LED-urilor de pe stradă (indexate logic 0-7) sunt mapate intern de codul Arduino astfel încât indexul `i` să fie trimis la bitul `(i + 1) % 8`. Așadar, logica C++ nu e afectată, software-ul Arduino mută biții corect!
 | **D5** | Clock Shift Register | Pin SHCP (11) al tuturor IC-urilor |
 | **D6** | Latch Shift Register | Pin STCP (12) al tuturor IC-urilor |
-| **D7** | Semafoare VERDE (I1, I2) | LED Verde prin 220Ω |
-| **D8** | Semafoare ROȘU (I1, I2) | LED Rosu prin 220Ω |
-| **D9** | Semafoare VERDE (I3, I4) | LED Verde prin 220Ω |
-| **D10** | Semafoare ROȘU (I3, I4) | LED Rosu prin 220Ω |
-| **D11** | Servo Barieră I1 (Opțional) | Semnal PWM Servo SG90 |
-| **D12** | Servo Barieră I3 (Opțional) | Semnal PWM Servo SG90 |
+| **D7** | Semafor I1 — **VERDE** | LED Verde prin 220Ω |
+| **D8** | Semafor I1 — **ROȘU** | LED Rosu prin 220Ω |
+| **D9** | Semafor I4 — **VERDE** | LED Verde prin 220Ω |
+| **D10** | Semafor I4 — **ROȘU** | LED Rosu prin 220Ω |
+| **D11** | Servo **Bariera 1** (B1) | Semnal PWM Servo SG90 — 0°=Inchis, 90°=Deschis |
+| **D12** | Servo **Bariera 2** (B2) | Semnal PWM Servo SG90 — 0°=Inchis, 90°=Deschis |
 | **5V Sursă Externă** | Alimentare componente | 74HC595 VCC, Servo VCC (A NU SE CONECTA LA ARDUINO 5V!) |
 | **GND** | Masă comună | Toate GND (inclusiv GND-ul Arduino-ului) |
 | **USB** | Comunicare cu PC | Cablu la Laptop (COM3 / /dev/ttyUSB0) |
@@ -131,16 +131,8 @@ Arduino D5 (sau Q0-Q7 al 74HC595)
          GND
 ```
 
-> [!WARNING]
-> **NU conecta niciodată un LED direct la Arduino fără rezistență 220Ω!** Curentul maxim pe un pin Arduino este 40mA, iar un LED are nevoie de ~20mA. Fără rezistență, arzi LED-ul sau pinul Arduino!
 
----
-
-
-
----
-
-## 🔌 7. Conectarea Servo Motor (Bariere Ieșire)
+## 🔌 6. Conectarea Servo Motor (Bariere Ieșire)
 
 Barierele vor fi puse la finalul segmentelor S5 și S6. Când un LED ajunge la finalul străzii, PC-ul trimite comanda de ridicare.
 
@@ -159,60 +151,16 @@ Barierele vor fi puse la finalul segmentelor S5 și S6. Când un LED ajunge la f
 
 ---
 
-## 📐 8. Planul Fizic al Dioramei (Aranjament pe Lemn)
-
-```text
-+------------------------------------------------------------------+
-|  LEMN 100cm x 50cm                                               |
-|                                                                  |
-|       I1 ---------S1--------> I2                                 |
-|       |                        |                                 |
-|      S4                       S2                                 |
-|       |                        |                                 |
-|       v                        v                                 |
-|       I3 <--------S3--------- I4                                 |
-|       |                        |                                 |
-|      S5                       S6                                 |
-|       |                        |                                 |
-|       v                        v                                 |
-|    [Bariera 1]              [Bariera 2]                          |
-|                                                                  |
-|  [Arduino Nano]  [IC1-IC6 74HC595]                               |
-|  (ascuns sub lemn sau intr-o cutie mica)                         |
-+------------------------------------------------------------------+
-```
-
-**Legende:**
-- `[I1] [I2] [I3] [I4]` = Intersecții (LED verde + LED roșu semafor)
-- `===S1===` = Stradă din LED-uri albe (câte 8 per stradă)
-
----
-
-## 💻 9. Protocolul de Comunicare USB-Serial (Rezumat)
+## 💻 7. Protocolul de Comunicare USB-Serial (Rezumat)
 
 ### PC (C++) → Arduino (Comenzi)
 | Format | Exemplu | Acțiune |
 |---|---|---|
 | `L<ic>,<bit>,<val>\n` | `L0,3,1\n` | Aprinde LED-ul 3 de pe IC-ul 0 |
-| `B<id>,<stare>\n` | `B1,1\n` | Deschide bariera intersecției 1 |
-| `SF<id>,<culoare>\n` | `SF1,G\n` | Semaforul 1 → Verde (Green) |
-| `SF<id>,<culoare>\n` | `SF1,R\n` | Semaforul 1 → Roșu (Red) |
+| `B<id>,<stare>\n` | `B1,1\n` | Deschide Bariera 1 (D11 - Servo la 90°) |
+| `SF<id>,<culoare>\n` | `SF1,G\n` | Semaforul 1 (I1) → Verde (D7=HIGH, D8=LOW) |
+| `SF<id>,<culoare>\n` | `SF1,R\n` | Semaforul 1 (I1) → Roșu (D7=LOW, D8=HIGH) |
+| `SF<id>,<culoare>\n` | `SF2,G\n` | Semaforul 2 (I4) → Verde (D9=HIGH, D10=LOW) |
 
 ### Arduino → PC (Senzori)
 Momentan nu există senzori pe dioramă care să trimită date înapoi către C++. Comunicarea este strict PC → Arduino.
-
----
-
-## 🛒 10. Listă de Cumpărături (Dacă îți lipsesc componente)
-
-> [!NOTE]
-> Dacă ai deja trusa de electronică, verifică mai întâi ce ai. Probabil ai deja LED-uri, rezistențe și breadboard-uri.
-
-| Componentă | Preț estimat (RON) | Unde găsești |
-|---|---|---|
-| 74HC595 (x4 buc) | ~10 RON | Optimus Digital, Sigmanortec |
-| Servo SG90 | ~15 RON | eMAG, Optimus |
-| LED-uri (set 100 buc) | ~10 RON | Optimus, orice magazin electro |
-| Rezistențe 220Ω (set) | ~5 RON | Optimus |
-| Fire Jumper set | ~15 RON | eMAG, Optimus |
-| **TOTAL estimat** | **~63 RON** | (dacă ai Arduino și breadboard-uri) |
