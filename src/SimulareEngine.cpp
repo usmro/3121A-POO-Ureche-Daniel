@@ -6,7 +6,9 @@
 #include <iostream>
 
 SimulareEngine::SimulareEngine()
-    : isRunning(false), isPaused(false), speedMultiplier(3.0) {
+    : isRunning(false), isPaused(false), speedMultiplier(3.0),
+      lastIntroductionTime(std::chrono::steady_clock::now() - std::chrono::seconds(5)),
+      bariera1Deschisa(false), bariera2Deschisa(false) {
   // Initializare punte hardware
 #ifdef __linux__
   hwBridge = std::make_unique<SerialHardwareBridge>("/dev/ttyUSB0");
@@ -74,20 +76,15 @@ void SimulareEngine::buclaSimulare() {
       double dt = dtDuration.count() * speedMultiplier; // delta time
       lastTime = currentTime;
 
-      // --- Logica de Batching ---
-      if (vehiculeActive.empty() && !vehiculeInAsteptare.empty()) {
-        int masiniDeAdaugat = std::min(3, (int)vehiculeInAsteptare.size());
-        std::cout << "[Batching] Introducem " << masiniDeAdaugat
-                  << " vehicule noi pe harta.\n";
-
-        std::string bariere[] = {"B1", "B2"};
-        std::string intersectii[] = {"I1", "I2", "I3", "I4"};
-
-        for (int i = 0; i < masiniDeAdaugat; ++i) {
+      // --- Logica de Introducere Spatiata a Vehiculelor ---
+      if (!vehiculeInAsteptare.empty() && vehiculeActive.size() < 3) {
+        auto timeSinceLastIntro = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastIntroductionTime).count();
+        if (timeSinceLastIntro >= 4) {
           auto v = std::move(vehiculeInAsteptare.front());
           vehiculeInAsteptare.erase(vehiculeInAsteptare.begin());
 
-          std::string start = bariere[rand() % 2];
+          std::string start = (rand() % 2 == 0) ? "B1" : "B2";
+          std::string intersectii[] = {"I1", "I2", "I3", "I4"};
           std::string mid = intersectii[rand() % 4];
 
           // OBLIGATORIU: end trebuie sa fie diferit de start, altfel masina
@@ -104,59 +101,22 @@ void SimulareEngine::buclaSimulare() {
 
           v->setRuta(ruta1);
 
-          // Deschidem bariera pt intrare
-          int idBariera = (start == "B1") ? 1 : 2;
-          hwBridge->setBariera(idBariera, true);
-          std::cout << "[Bariere] Deschidere " << start
+          std::cout << "[Bariere] Auto-detectare deschidere " << start
                     << " pt intrare vehicul " << v->getId() << "\n";
-          std::this_thread::sleep_for(std::chrono::milliseconds(300));
-          hwBridge->setBariera(idBariera, false);
 
           vehiculeActive.push_back(std::move(v));
+          lastIntroductionTime = currentTime;
         }
       }
 
-      // 2. Miscare Masini si Aprindere LED-uri fizice
+      // 2. Miscare Masini si calcul LED-uri active global
+      std::set<std::pair<int, int>> noileLeduriGlobal;
+
       for (auto it = vehiculeActive.begin(); it != vehiculeActive.end();) {
         auto &v = *it;
         Strada *stradaCurenta = v->getStradaCurenta();
 
-        if (!stradaCurenta) {
-          // Vehiculul a ajuns la finalul traseului
-          std::cout << "> [" << v->getId() << "] a iesit de pe diorama.\n";
-
-          // Detectam bariera corecta din destinatia ultimei strazi din ruta
-          auto ruta = v->getRuta();
-          int idBariera = 1; // default B1
-          if (!ruta.empty()) {
-            std::string dest = ruta.back()->getDestinatie();
-            if (dest == "B2") idBariera = 2;
-            else idBariera = 1;
-          }
-
-          hwBridge->setBariera(idBariera, true);
-          std::this_thread::sleep_for(std::chrono::milliseconds(600));
-          hwBridge->setBariera(idBariera, false);
-
-          // Stingem ultimul LED cand a iesit
-          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
-            auto oldLeds = ultimeleLeduri[v->getId()];
-            for (auto l : oldLeds) {
-              hwBridge->setLedStatus(l.first, l.second, false);
-            }
-            ultimeleLeduri.erase(v->getId());
-          }
-
-          it = vehiculeActive.erase(it);
-          continue;
-        }
-
         // --- LOGICA SEMAFOR ---
-        // Blocam vehiculul in 2 situatii:
-        // 1. Se APROPIE de I1/I4 (dest=="I1"/"I4") si e la >= 85%
-        // 2. TOCMAI A INTRAT pe o strada din I1/I4 (sursa=="I1"/"I4") si e la < 10%
-        //    EXCEPTIE: Daca drum duce la B1/B2 (iesire din oras), NU blocam!
-        //    (vehiculul a trecut deja intersectia si se indreapta spre iesire)
         bool blocat = false;
         {
           double progresNorm = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
@@ -196,18 +156,11 @@ void SimulareEngine::buclaSimulare() {
                     << numeStradaVeche << "\n";
         }
 
-        // --- BUGFIX MAJOR: REFRESH LA STRADA CURENTA ---
+        // Refresh la strada curenta
         stradaCurenta = v->getStradaCurenta();
 
         if (!stradaCurenta) {
-          // A terminat toata ruta! Stingem ultimele LED-uri.
-          if (ultimeleLeduri.find(v->getId()) != ultimeleLeduri.end()) {
-            auto oldLeds = ultimeleLeduri[v->getId()];
-            for (auto l : oldLeds) {
-              hwBridge->setLedStatus(l.first, l.second, false);
-            }
-            ultimeleLeduri.erase(v->getId());
-          }
+          std::cout << "> [" << v->getId() << "] a iesit de pe diorama.\n";
           it = vehiculeActive.erase(it);
           continue;
         }
@@ -233,15 +186,12 @@ void SimulareEngine::buclaSimulare() {
         if (nume.find("_inv") != std::string::npos)
           invers = true;
 
-        // Daca suntem pe S1 sau S2, cablarea lor fizica este in sens opus!
-        // Deci inversam logica de sens pentru ele
         if (idHardware == 0 || idHardware == 1) {
           invers = !invers;
         }
 
         if (idHardware != -1) {
-          double progres =
-              v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
+          double progres = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
           int baseIndexLed = (int)(progres * 8.0);
           if (baseIndexLed >= 8)
             baseIndexLed = 7;
@@ -252,50 +202,77 @@ void SimulareEngine::buclaSimulare() {
           else if (v->getId().find("CAMION") != std::string::npos)
             numLeds = 3;
 
-          std::vector<std::pair<int, int>> noileLeduri;
           for (int i = 0; i < numLeds; ++i) {
             int logicIndex = baseIndexLed - i;
             if (logicIndex >= 0 && logicIndex < 8) {
               int hwIndex = logicIndex;
               if (invers)
                 hwIndex = 7 - hwIndex;
-              noileLeduri.push_back({idHardware, hwIndex});
+              noileLeduriGlobal.insert({idHardware, hwIndex});
             }
           }
 
-          bool pozitieNoua = false;
-          auto &oldLeds = ultimeleLeduri[v->getId()];
-
-          if (oldLeds != noileLeduri) {
-            pozitieNoua = true;
-            // Stingem ce nu mai este in "noileLeduri"
-            for (auto oldL : oldLeds) {
-              if (std::find(noileLeduri.begin(), noileLeduri.end(), oldL) ==
-                  noileLeduri.end()) {
-                hwBridge->setLedStatus(oldL.first, oldL.second, false);
-              }
-            }
-            // Aprindem ce e nou
-            for (auto newL : noileLeduri) {
-              if (std::find(oldLeds.begin(), oldLeds.end(), newL) ==
-                  oldLeds.end()) {
-                hwBridge->setLedStatus(newL.first, newL.second, true);
-              }
-            }
-            ultimeleLeduri[v->getId()] = noileLeduri;
-          }
-
-          if (!pozitieNoua) {
-            // Printam progresul pe linie noua ca sa fie 100% vizibil in
-            // terminal
+          if (ultimulIndexLedTiparit[v->getId()] != baseIndexLed) {
             std::cout << "[Simulare] " << v->getId() << " parcurge " << nume
                       << " - LED Base: " << baseIndexLed
                       << " (Progres: " << (int)(progres * 100) << "%)\n";
+            ultimulIndexLedTiparit[v->getId()] = baseIndexLed;
           }
         }
 
         ++it;
       }
+
+      // 3. Update global LED status on Arduino
+      // Turn off LEDs that are no longer active
+      for (const auto &oldL : leduriActiveGlobal) {
+        if (noileLeduriGlobal.find(oldL) == noileLeduriGlobal.end()) {
+          hwBridge->setLedStatus(oldL.first, oldL.second, false);
+        }
+      }
+      // Turn on new active LEDs
+      for (const auto &newL : noileLeduriGlobal) {
+        if (leduriActiveGlobal.find(newL) == leduriActiveGlobal.end()) {
+          hwBridge->setLedStatus(newL.first, newL.second, true);
+        }
+      }
+      leduriActiveGlobal = noileLeduriGlobal;
+
+      // 4. Update Barrier Status (State-Driven, Non-Blocking)
+      bool deschideB1 = false;
+      bool deschideB2 = false;
+
+      for (const auto &v : vehiculeActive) {
+        Strada *stradaCurenta = v->getStradaCurenta();
+        if (stradaCurenta) {
+          std::string nume = stradaCurenta->getNume();
+          double progresNorm = v->getProgresPeStradaCurenta() / stradaCurenta->getLungime();
+
+          if (nume == "S1" && progresNorm > 0.90) {
+            deschideB1 = true;
+          }
+          if (nume == "S1_inv" && progresNorm < 0.10) {
+            deschideB1 = true;
+          }
+          if (nume == "S6" && progresNorm > 0.90) {
+            deschideB2 = true;
+          }
+          if (nume == "S6_inv" && progresNorm < 0.10) {
+            deschideB2 = true;
+          }
+        }
+      }
+
+      if (deschideB1 != bariera1Deschisa) {
+        bariera1Deschisa = deschideB1;
+        hwBridge->setBariera(1, bariera1Deschisa);
+      }
+
+      if (deschideB2 != bariera2Deschisa) {
+        bariera2Deschisa = deschideB2;
+        hwBridge->setBariera(2, bariera2Deschisa);
+      }
+
     } else {
       lastTime = std::chrono::steady_clock::now(); // reset
     }
@@ -304,3 +281,4 @@ void SimulareEngine::buclaSimulare() {
         std::chrono::milliseconds(100)); // Tick la 100ms
   }
 }
+
