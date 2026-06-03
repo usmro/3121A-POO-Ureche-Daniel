@@ -7,6 +7,8 @@
 #include <atomic>
 #include <string>
 #include <map>
+#include <set>
+#include <chrono>
 #include "ReteaRutiera.hpp"
 #include "Vehicul.hpp"
 #include "HardwareBridge.hpp"
@@ -17,7 +19,11 @@ private:
     std::vector<std::unique_ptr<Vehicul>> vehiculeActive;
     std::vector<std::unique_ptr<Vehicul>> vehiculeInAsteptare;
     std::unique_ptr<IHardwareBridge> hwBridge;
-    std::map<std::string, std::vector<std::pair<int, int>>> ultimeleLeduri;
+    std::set<std::pair<int, int>> leduriActiveGlobal;
+    std::map<std::string, int> ultimulIndexLedTiparit;
+    std::chrono::steady_clock::time_point lastIntroductionTime;
+    bool bariera1Deschisa;
+    bool bariera2Deschisa;
 
     
     std::atomic<bool> isRunning;
